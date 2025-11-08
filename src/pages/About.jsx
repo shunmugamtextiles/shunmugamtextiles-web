@@ -43,7 +43,7 @@ const About = () => {
             </h3>
             
             {/* First Row - Proprietors */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mb-8 md:mb-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 lg:gap-12 mb-6 md:mb-8 lg:mb-12">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-40 h-40 md:w-48 md:h-48 rounded-lg overflow-hidden border-2 border-slate-200 shadow-md flex items-center justify-center p-2">
                   <img
@@ -80,7 +80,7 @@ const About = () => {
             </div>
 
             {/* Second Row - Executive Directors */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               <div className="flex flex-col items-center gap-4">
                 <div className="w-40 h-40 md:w-48 md:h-48 rounded-lg overflow-hidden border-2 border-slate-200 shadow-md flex items-center justify-center p-2">
                   <img

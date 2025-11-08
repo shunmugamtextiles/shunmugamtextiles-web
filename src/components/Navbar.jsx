@@ -16,19 +16,19 @@ const Navbar = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50 py-3">
+    <nav className="bg-white shadow-md sticky top-0 z-50 py-2 md:py-3">
       <div className="max-w-7xl mx-auto px-4 md:px-6 flex justify-between items-center">
         <Link to="/" className="flex items-center gap-2 md:gap-3 no-underline">
-          <img src="/logo.jpg" alt="Shunmugam Textiles" className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-blue-800" />
-          <span className="text-blue-900 font-semibold text-base md:text-lg">Shunmugam Textiles</span>
+          <img src="/logo.jpg" alt="Shunmugam Textiles" className="w-9 h-9 md:w-12 md:h-12 rounded-full object-cover border-2 border-blue-800 shrink-0" />
+          <span className="text-blue-900 font-semibold text-sm md:text-base lg:text-lg">Shunmugam Textiles</span>
         </Link>
 
-        <div className={`md:flex gap-8 items-center ${isMenuOpen ? 'fixed left-0 top-[70px] flex-col bg-white w-full text-center shadow-lg py-8 gap-6' : 'hidden'}`}>
+        <div className={`md:flex gap-6 lg:gap-8 items-center ${isMenuOpen ? 'fixed left-0 top-[60px] md:top-[70px] flex-col bg-white w-full text-center shadow-lg py-6 md:py-8 gap-4 md:gap-6 z-40' : 'hidden'}`}>
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`no-underline font-medium text-[0.95rem] transition-colors relative ${
+              className={`no-underline font-medium text-sm md:text-[0.95rem] transition-colors relative px-4 py-2 ${
                 isActive(item.path) 
                   ? 'text-blue-600 after:content-[""] after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600' 
                   : 'text-slate-600 hover:text-blue-600'

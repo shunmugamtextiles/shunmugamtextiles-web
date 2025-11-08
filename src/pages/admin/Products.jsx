@@ -365,20 +365,20 @@ const AdminProducts = () => {
 
       {/* Header */}
       <header className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="flex items-center gap-2 md:gap-4">
               <Link
                 to="/admin/dashboard"
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
               >
-                <ArrowLeft size={24} className="text-blue-900" />
+                <ArrowLeft size={20} className="md:w-6 md:h-6 text-blue-900" />
               </Link>
-              <div className="flex items-center gap-3">
-                <Package size={32} className="text-purple-600" />
+              <div className="flex items-center gap-2 md:gap-3">
+                <Package size={24} className="md:w-8 md:h-8 text-purple-600 shrink-0" />
                 <div>
-                  <h1 className="text-2xl font-bold text-blue-900">Products</h1>
-                  <p className="text-sm text-slate-600">Manage product catalog</p>
+                  <h1 className="text-lg md:text-2xl font-bold text-blue-900">Products</h1>
+                  <p className="text-xs md:text-sm text-slate-600">Manage product catalog</p>
                 </div>
               </div>
             </div>
@@ -387,25 +387,25 @@ const AdminProducts = () => {
                 handleCancel();
                 setShowAddForm(true);
               }}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium transition-all hover:bg-purple-700 flex items-center gap-2"
+              className="bg-purple-600 text-white px-3 md:px-4 py-2 rounded-lg font-medium transition-all hover:bg-purple-700 flex items-center gap-2 text-sm md:text-base w-full sm:w-auto justify-center"
             >
-              <Plus size={20} />
-              Add Product
+              <Plus size={18} className="md:w-5 md:h-5" />
+              <span>Add Product</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
         {/* Add/Edit Product Form */}
         {(showAddForm || showEditForm) && (
-          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-            <h2 className="text-xl font-bold text-blue-900 mb-4">
+          <div className="bg-white rounded-xl shadow-md p-4 md:p-6 mb-4 md:mb-6">
+            <h2 className="text-lg md:text-xl font-bold text-blue-900 mb-4">
               {showEditForm ? 'Edit Product' : 'Add New Product'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
                   <label htmlFor="name" className="block text-sm font-semibold text-slate-700 mb-2">
                     Product Name *
@@ -504,11 +504,11 @@ const AdminProducts = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
                   disabled={submitting || uploadingImage}
-                  className="bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-all hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-purple-600 text-white px-4 md:px-6 py-2 rounded-lg font-medium transition-all hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
                 >
                   {submitting 
                     ? (showEditForm ? 'Updating...' : 'Adding...') 
@@ -518,7 +518,7 @@ const AdminProducts = () => {
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="bg-slate-200 text-slate-700 px-6 py-2 rounded-lg font-medium transition-all hover:bg-slate-300"
+                  className="bg-slate-200 text-slate-700 px-4 md:px-6 py-2 rounded-lg font-medium transition-all hover:bg-slate-300 text-sm md:text-base"
                 >
                   Cancel
                 </button>
@@ -546,52 +546,118 @@ const AdminProducts = () => {
               <p className="text-slate-500 mb-4">Click "Add Product" to create your first product</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Image
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Product Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Created At
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {products.map((product) => (
-                    <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {product.imageUrl ? (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-16 h-16 object-cover rounded-lg border-2 border-slate-200"
-                            onError={(e) => {
-                              e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" fill="%23e2e8f0"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-size="24"%3E%3C/text%3E%3C/svg%3E';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center">
-                            <ImageIcon size={24} className="text-slate-400" />
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Image
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Product Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Created At
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {products.map((product) => (
+                      <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {product.imageUrl ? (
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="w-16 h-16 object-cover rounded-lg border-2 border-slate-200"
+                              onError={(e) => {
+                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" fill="%23e2e8f0"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-size="24"%3E%3C/text%3E%3C/svg%3E';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center">
+                              <ImageIcon size={24} className="text-slate-400" />
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="font-medium text-purple-900">{product.name}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                              (product.status || 'in stock') === 'in stock'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {(product.status || 'in stock') === 'in stock' ? 'In Stock' : 'Out of Stock'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-slate-500 text-sm">
+                            {product.createdAt 
+                              ? new Date(product.createdAt).toLocaleDateString()
+                              : 'N/A'
+                            }
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleEdit(product)}
+                              className="text-purple-600 hover:text-purple-800 transition-colors p-2 hover:bg-purple-50 rounded-lg"
+                              title="Edit product"
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(product.id, product.name)}
+                              className="text-red-600 hover:text-red-800 transition-colors p-2 hover:bg-red-50 rounded-lg"
+                              title="Delete product"
+                            >
+                              <Trash2 size={18} />
+                            </button>
                           </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-medium text-purple-900">{product.name}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {products.map((product) => (
+                  <div key={product.id} className="bg-white border-2 border-slate-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-20 h-20 object-cover rounded-lg border-2 border-slate-200 shrink-0"
+                          onError={(e) => {
+                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" fill="%23e2e8f0"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-size="24"%3E%3C/text%3E%3C/svg%3E';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-slate-200 rounded-lg flex items-center justify-center shrink-0">
+                          <ImageIcon size={24} className="text-slate-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Product Name</p>
+                        <p className="font-semibold text-purple-900 truncate">{product.name}</p>
                         <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold mt-2 ${
                             (product.status || 'in stock') === 'in stock'
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
@@ -599,38 +665,37 @@ const AdminProducts = () => {
                         >
                           {(product.status || 'in stock') === 'in stock' ? 'In Stock' : 'Out of Stock'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-slate-500 text-sm">
-                          {product.createdAt 
-                            ? new Date(product.createdAt).toLocaleDateString()
-                            : 'N/A'
-                          }
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEdit(product)}
-                            className="text-purple-600 hover:text-purple-800 transition-colors p-2 hover:bg-purple-50 rounded-lg"
-                            title="Edit product"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(product.id, product.name)}
-                            className="text-red-600 hover:text-red-800 transition-colors p-2 hover:bg-red-50 rounded-lg"
-                            title="Delete product"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Created At</p>
+                      <p className="text-slate-500 text-sm">
+                        {product.createdAt 
+                          ? new Date(product.createdAt).toLocaleDateString()
+                          : 'N/A'
+                        }
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="flex-1 bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors py-2 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        <Edit2 size={16} />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product.id, product.name)}
+                        className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 transition-colors py-2 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        <Trash2 size={16} />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </main>

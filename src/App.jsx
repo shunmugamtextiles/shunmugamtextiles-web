@@ -10,7 +10,7 @@ import Dashboard from './pages/admin/Dashboard';
 import Supervisors from './pages/admin/Supervisors';
 import Weavers from './pages/admin/Weavers';
 import AdminProducts from './pages/admin/Products';
-import './App.css';
+import Reports from './pages/admin/Reports';
 
 function App() {
   return (
@@ -44,6 +44,11 @@ function App() {
         <Route path="/admin/products" element={
           <ProtectedRoute>
             <AdminProducts />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/reports" element={
+          <ProtectedRoute>
+            <Reports />
           </ProtectedRoute>
         } />
       </Routes>

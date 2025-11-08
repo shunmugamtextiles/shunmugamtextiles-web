@@ -304,20 +304,20 @@ const Supervisors = () => {
 
       {/* Header */}
       <header className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <div className="flex items-center gap-2 md:gap-4">
               <Link
                 to="/admin/dashboard"
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
               >
-                <ArrowLeft size={24} className="text-blue-900" />
+                <ArrowLeft size={20} className="md:w-6 md:h-6 text-blue-900" />
               </Link>
-              <div className="flex items-center gap-3">
-                <UserCheck size={32} className="text-blue-600" />
+              <div className="flex items-center gap-2 md:gap-3">
+                <UserCheck size={24} className="md:w-8 md:h-8 text-blue-600 shrink-0" />
                 <div>
-                  <h1 className="text-2xl font-bold text-blue-900">Supervisors</h1>
-                  <p className="text-sm text-slate-600">Manage supervisor accounts</p>
+                  <h1 className="text-lg md:text-2xl font-bold text-blue-900">Supervisors</h1>
+                  <p className="text-xs md:text-sm text-slate-600">Manage supervisor accounts</p>
                 </div>
               </div>
             </div>
@@ -326,25 +326,25 @@ const Supervisors = () => {
                 handleCancel();
                 setShowAddForm(true);
               }}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-all hover:bg-blue-700 flex items-center gap-2"
+              className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg font-medium transition-all hover:bg-blue-700 flex items-center gap-2 text-sm md:text-base w-full sm:w-auto justify-center"
             >
-              <Plus size={20} />
-              Add Supervisor
+              <Plus size={18} className="md:w-5 md:h-5" />
+              <span>Add Supervisor</span>
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
         {/* Add/Edit Supervisor Form */}
         {(showAddForm || showEditForm) && (
-          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-            <h2 className="text-xl font-bold text-blue-900 mb-4">
+          <div className="bg-white rounded-xl shadow-md p-4 md:p-6 mb-4 md:mb-6">
+            <h2 className="text-lg md:text-xl font-bold text-blue-900 mb-4">
               {showEditForm ? 'Edit Supervisor' : 'Add New Supervisor'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                 <div>
                   <label htmlFor="supervisorId" className="block text-sm font-semibold text-slate-700 mb-2">
                     Supervisor ID *
@@ -395,7 +395,7 @@ const Supervisors = () => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                 <div>
                   <label htmlFor="status" className="block text-sm font-semibold text-slate-700 mb-2">
                     Status *
@@ -413,11 +413,11 @@ const Supervisors = () => {
                   </select>
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium transition-all hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-blue-600 text-white px-4 md:px-6 py-2 rounded-lg font-medium transition-all hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
                 >
                   {submitting 
                     ? (showEditForm ? 'Updating...' : 'Adding...') 
@@ -427,7 +427,7 @@ const Supervisors = () => {
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="bg-slate-200 text-slate-700 px-6 py-2 rounded-lg font-medium transition-all hover:bg-slate-300"
+                  className="bg-slate-200 text-slate-700 px-4 md:px-6 py-2 rounded-lg font-medium transition-all hover:bg-slate-300 text-sm md:text-base"
                 >
                   Cancel
                 </button>
@@ -455,102 +455,179 @@ const Supervisors = () => {
               <p className="text-slate-500 mb-4">Click "Add Supervisor" to create your first supervisor account</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Supervisor ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Password
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Created At
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {supervisors.map((supervisor) => (
-                    <tr key={supervisor.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-medium text-blue-900">{supervisor.supervisorId}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-slate-700">{supervisor.name}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-700 font-mono">
-                            {visiblePasswords[supervisor.id] 
-                              ? supervisor.password 
-                              : '•'.repeat(8)
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Supervisor ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Password
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Created At
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {supervisors.map((supervisor) => (
+                      <tr key={supervisor.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="font-medium text-blue-900">{supervisor.supervisorId}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-slate-700">{supervisor.name}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-700 font-mono text-sm">
+                              {visiblePasswords[supervisor.id] 
+                                ? supervisor.password 
+                                : '•'.repeat(8)
+                              }
+                            </span>
+                            <button
+                              onClick={() => togglePasswordVisibility(supervisor.id)}
+                              className="text-slate-500 hover:text-blue-600 transition-colors p-1 hover:bg-slate-100 rounded"
+                              title={visiblePasswords[supervisor.id] ? 'Hide password' : 'Show password'}
+                            >
+                              {visiblePasswords[supervisor.id] ? (
+                                <EyeOff size={16} />
+                              ) : (
+                                <Eye size={16} />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                              (supervisor.status || 'active') === 'active'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {(supervisor.status || 'active') === 'active' ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-slate-500 text-sm">
+                            {supervisor.createdAt 
+                              ? new Date(supervisor.createdAt).toLocaleDateString()
+                              : 'N/A'
                             }
                           </span>
-                          <button
-                            onClick={() => togglePasswordVisibility(supervisor.id)}
-                            className="text-slate-500 hover:text-blue-600 transition-colors p-1 hover:bg-slate-100 rounded"
-                            title={visiblePasswords[supervisor.id] ? 'Hide password' : 'Show password'}
-                          >
-                            {visiblePasswords[supervisor.id] ? (
-                              <EyeOff size={16} />
-                            ) : (
-                              <Eye size={16} />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                            (supervisor.status || 'active') === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          {(supervisor.status || 'active') === 'active' ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-slate-500 text-sm">
-                          {supervisor.createdAt 
-                            ? new Date(supervisor.createdAt).toLocaleDateString()
-                            : 'N/A'
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleEdit(supervisor)}
+                              className="text-blue-600 hover:text-blue-800 transition-colors p-2 hover:bg-blue-50 rounded-lg"
+                              title="Edit supervisor"
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(supervisor.id, supervisor.supervisorId)}
+                              className="text-red-600 hover:text-red-800 transition-colors p-2 hover:bg-red-50 rounded-lg"
+                              title="Delete supervisor"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {supervisors.map((supervisor) => (
+                  <div key={supervisor.id} className="bg-white border-2 border-slate-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Supervisor ID</p>
+                        <p className="font-semibold text-blue-900">{supervisor.supervisorId}</p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${
+                          (supervisor.status || 'active') === 'active'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {(supervisor.status || 'active') === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Name</p>
+                      <p className="text-slate-700">{supervisor.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Password</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-700 font-mono text-sm">
+                          {visiblePasswords[supervisor.id] 
+                            ? supervisor.password 
+                            : '•'.repeat(8)
                           }
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEdit(supervisor)}
-                            className="text-blue-600 hover:text-blue-800 transition-colors p-2 hover:bg-blue-50 rounded-lg"
-                            title="Edit supervisor"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(supervisor.id, supervisor.supervisorId)}
-                            className="text-red-600 hover:text-red-800 transition-colors p-2 hover:bg-red-50 rounded-lg"
-                            title="Delete supervisor"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <button
+                          onClick={() => togglePasswordVisibility(supervisor.id)}
+                          className="text-slate-500 hover:text-blue-600 transition-colors p-1 hover:bg-slate-100 rounded"
+                          title={visiblePasswords[supervisor.id] ? 'Hide password' : 'Show password'}
+                        >
+                          {visiblePasswords[supervisor.id] ? (
+                            <EyeOff size={16} />
+                          ) : (
+                            <Eye size={16} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Created At</p>
+                      <p className="text-slate-500 text-sm">
+                        {supervisor.createdAt 
+                          ? new Date(supervisor.createdAt).toLocaleDateString()
+                          : 'N/A'
+                        }
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                      <button
+                        onClick={() => handleEdit(supervisor)}
+                        className="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors py-2 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        <Edit2 size={16} />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(supervisor.id, supervisor.supervisorId)}
+                        className="flex-1 bg-red-50 text-red-600 hover:bg-red-100 transition-colors py-2 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        <Trash2 size={16} />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </main>
