@@ -44,7 +44,7 @@ const Navbar = () => {
           to="/login"
           className="hidden md:block bg-blue-600 text-white px-6 py-2.5 rounded-md font-medium text-[0.95rem] transition-all hover:bg-blue-700 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-600/30 no-underline"
         >
-          Admin Login
+          Login
         </Link>
 
         <button

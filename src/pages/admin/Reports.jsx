@@ -18,7 +18,8 @@ const Reports = () => {
     startDate: '',
     endDate: '',
     supervisorId: '',
-    weaverId: ''
+    weaverId: '',
+    receiptId: ''
   });
   const [showFilters, setShowFilters] = useState(false);
 
@@ -155,6 +156,14 @@ const Reports = () => {
       filtered = filtered.filter(receipt => {
         const weaverId = receipt.weaverId || receipt.weaver_id || receipt.loomNo || receipt.loom_no || '';
         return weaverId.toLowerCase().includes(filters.weaverId.toLowerCase());
+      });
+    }
+
+    // Filter by receipt ID
+    if (filters.receiptId) {
+      filtered = filtered.filter(receipt => {
+        const receiptNo = receipt.receiptNo || receipt.receiptNumber || receipt.receipt_no || '';
+        return receiptNo.toLowerCase().includes(filters.receiptId.toLowerCase());
       });
     }
 
@@ -384,7 +393,8 @@ const Reports = () => {
       startDate: '',
       endDate: '',
       supervisorId: '',
-      weaverId: ''
+      weaverId: '',
+      receiptId: ''
     });
   };
 
@@ -396,7 +406,7 @@ const Reports = () => {
   };
 
   const tableColumns = getTableColumns();
-  const hasActiveFilters = filters.startDate || filters.endDate || filters.supervisorId || filters.weaverId;
+  const hasActiveFilters = filters.startDate || filters.endDate || filters.supervisorId || filters.weaverId || filters.receiptId;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -449,7 +459,7 @@ const Reports = () => {
 
           {showFilters && (
             <div className="p-4 md:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* Start Date */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -500,6 +510,20 @@ const Reports = () => {
                     value={filters.weaverId}
                     onChange={(e) => handleFilterChange('weaverId', e.target.value)}
                     placeholder="Enter Loom ID"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+
+                {/* Receipt ID */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Receipt ID
+                  </label>
+                  <input
+                    type="text"
+                    value={filters.receiptId}
+                    onChange={(e) => handleFilterChange('receiptId', e.target.value)}
+                    placeholder="Enter Receipt ID"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
