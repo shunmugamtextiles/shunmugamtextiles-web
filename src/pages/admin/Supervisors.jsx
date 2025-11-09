@@ -170,6 +170,12 @@ const Supervisors = () => {
     setShowAddForm(false);
   };
 
+  // Validate supervisor ID format (SH1, SH2, SH3, etc.)
+  const validateSupervisorId = (id) => {
+    const pattern = /^SH\d+$/i;
+    return pattern.test(id);
+  };
+
   // Handle form submission (both add and edit)
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -179,6 +185,13 @@ const Supervisors = () => {
       // Validate inputs
       if (!formData.supervisorId || !formData.name || !formData.password || !formData.status) {
         showModal('Validation Error', 'All fields are required', 'error');
+        setSubmitting(false);
+        return;
+      }
+
+      // Validate supervisor ID format
+      if (!validateSupervisorId(formData.supervisorId)) {
+        showModal('Validation Error', 'Supervisor ID must be in the format SH1, SH2, SH3, etc. (SH followed by numbers)', 'error');
         setSubmitting(false);
         return;
       }
@@ -355,13 +368,20 @@ const Supervisors = () => {
                     name="supervisorId"
                     value={formData.supervisorId}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10"
-                    placeholder="Enter supervisor ID"
+                    className={`w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-4 focus:ring-blue-600/10 ${
+                      formData.supervisorId && !validateSupervisorId(formData.supervisorId)
+                        ? 'border-red-300 focus:border-red-600'
+                        : 'border-slate-200 focus:border-blue-600'
+                    }`}
+                    placeholder="Enter supervisor ID (e.g., SH1, SH2)"
                     required
                     disabled={showEditForm}
                   />
                   {showEditForm && (
                     <p className="text-xs text-slate-500 mt-1">Supervisor ID cannot be changed</p>
+                  )}
+                  {formData.supervisorId && !validateSupervisorId(formData.supervisorId) && (
+                    <p className="text-xs text-red-600 mt-1">Format must be SH1, SH2, SH3, etc.</p>
                   )}
                 </div>
                 <div>

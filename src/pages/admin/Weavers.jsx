@@ -167,6 +167,12 @@ const Weavers = () => {
     setShowAddForm(false);
   };
 
+  // Validate weaver ID format (1, 2, 3, etc. - numbers only)
+  const validateWeaverId = (id) => {
+    const pattern = /^\d+$/;
+    return pattern.test(id);
+  };
+
   // Handle form submission (both add and edit)
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -176,6 +182,13 @@ const Weavers = () => {
       // Validate inputs
       if (!formData.weaverId || !formData.name || !formData.status) {
         showModal('Validation Error', 'All fields are required', 'error');
+        setSubmitting(false);
+        return;
+      }
+
+      // Validate weaver ID format
+      if (!validateWeaverId(formData.weaverId)) {
+        showModal('Validation Error', 'Weaver ID must be a number (e.g., 1, 2, 3, etc.)', 'error');
         setSubmitting(false);
         return;
       }
@@ -342,13 +355,20 @@ const Weavers = () => {
                     name="weaverId"
                     value={formData.weaverId}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-green-600 focus:ring-4 focus:ring-green-600/10"
-                    placeholder="Enter weaver ID"
+                    className={`w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-4 focus:ring-green-600/10 ${
+                      formData.weaverId && !validateWeaverId(formData.weaverId)
+                        ? 'border-red-300 focus:border-red-600'
+                        : 'border-slate-200 focus:border-green-600'
+                    }`}
+                    placeholder="Enter weaver ID (e.g., 1, 2, 3)"
                     required
                     disabled={showEditForm}
                   />
                   {showEditForm && (
                     <p className="text-xs text-slate-500 mt-1">Weaver ID cannot be changed</p>
+                  )}
+                  {formData.weaverId && !validateWeaverId(formData.weaverId) && (
+                    <p className="text-xs text-red-600 mt-1">Weaver ID must be a number (e.g., 1, 2, 3)</p>
                   )}
                 </div>
                 <div>
