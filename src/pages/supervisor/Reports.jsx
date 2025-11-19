@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, FileText, Download, Filter, X } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import * as XLSX from 'xlsx';
+import {
+  BASE_COLUMN_SEQUENCE,
+  SUB_TOTAL_COLUMN_KEY,
+  getAllReportColumns,
+  getOrderedProductColumns
+} from '../../utils/reportColumns';
 
 const Reports = () => {
   const [receipts, setReceipts] = useState([]);
@@ -11,6 +17,21 @@ const Reports = () => {
   const [products, setProducts] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeReportView, setActiveReportView] = useState('supervisor');
+  const [dateRangeInputs, setDateRangeInputs] = useState({ start: '', end: '' });
+  const [dateRangeReport, setDateRangeReport] = useState({
+    rows: [],
+    productColumns: [],
+    startDate: '',
+    endDate: '',
+    generated: false
+  });
+  const [dateRangeError, setDateRangeError] = useState('');
+  const [dateRangeLoading, setDateRangeLoading] = useState(false);
+  const [deleteRangeInputs, setDeleteRangeInputs] = useState({ start: '', end: '' });
+  const [deleteRangeStatus, setDeleteRangeStatus] = useState({ type: '', message: '' });
+  const [deleteRangeLoading, setDeleteRangeLoading] = useState(false);
+  const [deleteConfirmData, setDeleteConfirmData] = useState(null);
   
   // Filter states (same as admin - includes supervisorId)
   const [filters, setFilters] = useState({
@@ -154,11 +175,6 @@ const Reports = () => {
     setFilteredReceipts(filtered);
   }, [filters, receipts]);
 
-  // Get base column names (excluding products)
-  const getBaseColumns = () => {
-    return ['date', 'receiptNo', 'supervisorId', 'weaverId', 'weaverName', 'product'];
-  };
-
   // Format date for display
   const formatDate = (date) => {
     if (!date) return 'N/A';
@@ -188,6 +204,36 @@ const Reports = () => {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const formatDisplayDate = (date) => {
+    if (!date) return 'N/A';
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  const applyCenterAlignment = (worksheet) => {
+    if (!worksheet || !worksheet['!ref']) return;
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    for (let row = range.s.R; row <= range.e.R; row += 1) {
+      for (let col = range.s.C; col <= range.e.C; col += 1) {
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+        const cell = worksheet[cellAddress];
+        if (cell) {
+          const alignment = { horizontal: 'center', vertical: 'center' };
+          cell.s = cell.s
+            ? { ...cell.s, alignment: { ...cell.s.alignment, ...alignment } }
+            : { alignment };
+        }
+      }
+    }
   };
 
   // Parse products from receipt and return quantities by product name
@@ -253,6 +299,38 @@ const Reports = () => {
     return result;
   };
 
+  const calculateSubTotal = (receipt) => {
+    const productQuantities = parseProductsFromReceipt(receipt);
+    return Object.values(productQuantities).reduce((sum, qty) => {
+      const numericQty = Number(qty);
+      if (Number.isNaN(numericQty)) {
+        return sum;
+      }
+      return sum + numericQty;
+    }, 0);
+  };
+
+  const getDisplayValue = (value) => {
+    if (value === null || value === undefined || value === '') {
+      return '-';
+    }
+    return value;
+  };
+
+  const getColumnLabel = (columnName) => {
+    if (columnName === 'date') return 'DATE';
+    if (columnName === 'receiptNo') return 'RECEIPT NO';
+    if (columnName === 'supervisorId') return 'SUPERVISOR ID';
+    if (columnName === 'weaverId') return 'LOOM NO';
+    if (columnName === 'loomNo') return 'LOOM';
+    if (columnName === 'weaverName') return 'WEAVER';
+    if (columnName === 'product') return 'PRODUCT';
+    if (columnName === 'sno') return 'S NO';
+    if (columnName === 'total') return 'TOTAL';
+    if (columnName === SUB_TOTAL_COLUMN_KEY) return 'TOTAL';
+    return columnName.toUpperCase();
+  };
+
   // Get value for a field
   const getFieldValue = (receipt, fieldName) => {
     // Handle date
@@ -284,6 +362,10 @@ const Reports = () => {
     if (fieldName.toLowerCase() === 'product') {
       return receipt.product || receipt.productName || receipt.product_name || 'PCS';
     }
+
+    if (fieldName === SUB_TOTAL_COLUMN_KEY) {
+      return calculateSubTotal(receipt);
+    }
     
     // Handle product columns (product names)
     const product = products.find(p => p.name === fieldName);
@@ -301,6 +383,246 @@ const Reports = () => {
     return String(value);
   };
 
+  const getRangeFieldValue = (row, columnName) => {
+    if (columnName === 'sno') return row.sno;
+    if (columnName === 'loomNo') return row.loomNo || '-';
+    if (columnName === 'weaverName') return row.weaverName || '-';
+    if (columnName === 'total') return row.total || 0;
+    return row[columnName] ?? 0;
+  };
+
+  const getReceiptNumberFromRecord = (receipt) => {
+    return receipt.receiptNo || receipt.receiptNumber || receipt.receipt_no || '';
+  };
+
+  const handleDeleteRangeInputChange = (field, value) => {
+    setDeleteRangeInputs(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setDeleteRangeStatus({ type: '', message: '' });
+  };
+
+  const isReceiptWithinRange = (value, start, end) => {
+    if (!value) return false;
+    const trimmedValue = value.trim();
+    if (!trimmedValue) return false;
+
+    const toNumber = (val) => {
+      const num = Number(val);
+      return Number.isNaN(num) ? null : num;
+    };
+
+    const startNum = toNumber(start);
+    const endNum = toNumber(end);
+
+    if (startNum !== null && endNum !== null) {
+      const targetNum = toNumber(trimmedValue);
+      if (targetNum === null) return false;
+      const min = Math.min(startNum, endNum);
+      const max = Math.max(startNum, endNum);
+      return targetNum >= min && targetNum <= max;
+    }
+
+    const normalizedStart = start.toLowerCase();
+    const normalizedEnd = end.toLowerCase();
+    const normalizedValue = trimmedValue.toLowerCase();
+    const startFirst = normalizedStart <= normalizedEnd;
+    if (startFirst) {
+      return normalizedValue >= normalizedStart && normalizedValue <= normalizedEnd;
+    }
+    return normalizedValue >= normalizedEnd && normalizedValue <= normalizedStart;
+  };
+
+  const handleDeleteReceipts = () => {
+    const start = deleteRangeInputs.start.trim();
+    const end = deleteRangeInputs.end.trim();
+    if (!start || !end) {
+      setDeleteRangeStatus({ type: 'error', message: 'Please enter both start and end receipt numbers.' });
+      return;
+    }
+
+    const matchingReceipts = receipts.filter(receipt =>
+      isReceiptWithinRange(getReceiptNumberFromRecord(receipt), start, end)
+    );
+
+    if (matchingReceipts.length === 0) {
+      setDeleteRangeStatus({ type: 'info', message: 'No receipts found in the specified range.' });
+      return;
+    }
+
+    setDeleteConfirmData({
+      start,
+      end,
+      receipts: matchingReceipts
+    });
+  };
+
+  const confirmDeleteReceipts = async () => {
+    if (!deleteConfirmData) return;
+    const { receipts: receiptsToDelete, start, end } = deleteConfirmData;
+    setDeleteRangeLoading(true);
+    setDeleteRangeStatus({ type: '', message: '' });
+
+    try {
+      await Promise.all(
+        receiptsToDelete.map(receipt => deleteDoc(doc(db, 'receipts', receipt.id)))
+      );
+      setDeleteRangeStatus({
+        type: 'success',
+        message: `Deleted ${receiptsToDelete.length} receipt(s) from ${start} to ${end}.`
+      });
+      setDeleteRangeInputs({ start: '', end: '' });
+      setDeleteConfirmData(null);
+      fetchReceipts();
+    } catch (error) {
+      console.error('Error deleting receipts:', error);
+      setDeleteRangeStatus({
+        type: 'error',
+        message: 'Failed to delete receipts. Please try again.'
+      });
+    } finally {
+      setDeleteRangeLoading(false);
+    }
+  };
+
+  const cancelDeleteConfirmation = () => {
+    setDeleteConfirmData(null);
+  };
+
+  const handleDateRangeInputChange = (field, value) => {
+    setDateRangeInputs(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setDateRangeError('');
+  };
+
+  const generateDateRangeReport = () => {
+    if (!dateRangeInputs.start || !dateRangeInputs.end) {
+      setDateRangeError('Please select both start and end dates.');
+      return;
+    }
+
+    const startDate = new Date(dateRangeInputs.start);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(dateRangeInputs.end);
+    endDate.setHours(23, 59, 59, 999);
+
+    if (startDate > endDate) {
+      setDateRangeError('Start date should be before end date.');
+      return;
+    }
+
+    setDateRangeLoading(true);
+    setDateRangeError('');
+
+    const productColumns = getOrderedProductColumns(products);
+    const rowsMap = new Map();
+
+    receipts.forEach((receipt) => {
+      const receiptDate = receipt.date
+        ? (receipt.date.toDate ? receipt.date.toDate() : new Date(receipt.date))
+        : null;
+      if (!receiptDate) return;
+      if (receiptDate < startDate || receiptDate > endDate) return;
+
+      const loomNo = receipt.loomNo || receipt.loom_no || receipt.weaverId || receipt.weaver_id || 'N/A';
+      const weaverName = receipt.weaverName || receipt.weaver_name || receipt.name || 'N/A';
+      const key = `${loomNo}__${weaverName}`;
+
+      if (!rowsMap.has(key)) {
+        const initialRow = { loomNo, weaverName, total: 0 };
+        productColumns.forEach(name => {
+          initialRow[name] = 0;
+        });
+        rowsMap.set(key, initialRow);
+      }
+
+      const row = rowsMap.get(key);
+      const productQuantities = parseProductsFromReceipt(receipt);
+      productColumns.forEach(name => {
+        const qty = Number(productQuantities[name]) || 0;
+        if (!qty) return;
+        row[name] = (row[name] || 0) + qty;
+        row.total = (row.total || 0) + qty;
+      });
+    });
+
+    const rows = Array.from(rowsMap.values())
+      .sort((a, b) => {
+        const loomA = parseInt(a.loomNo, 10);
+        const loomB = parseInt(b.loomNo, 10);
+        if (!Number.isNaN(loomA) && !Number.isNaN(loomB)) {
+          return loomA - loomB;
+        }
+        return (a.loomNo || '').localeCompare(b.loomNo || '');
+      })
+      .map((row, index) => ({
+        ...row,
+        sno: index + 1
+      }));
+
+    setDateRangeReport({
+      rows,
+      productColumns,
+      startDate: dateRangeInputs.start,
+      endDate: dateRangeInputs.end,
+      generated: true
+    });
+    setDateRangeLoading(false);
+  };
+
+  const handleDateRangeReportDownload = () => {
+    if (!dateRangeReport.generated || dateRangeReport.rows.length === 0) {
+      return;
+    }
+
+    const columns = ['sno', 'loomNo', 'weaverName', ...dateRangeReport.productColumns, 'total'];
+    const headerRow = columns.map(col => {
+      if (col === 'sno') return 'S NO';
+      if (col === 'loomNo') return 'LOOM';
+      if (col === 'weaverName') return 'WEAVER';
+      if (col === 'total') return 'TOTAL';
+      return col.toUpperCase();
+    });
+
+    const title = `PCS DELIVERY FROM DATE : ${formatDisplayDate(dateRangeReport.startDate)} TO : ${formatDisplayDate(dateRangeReport.endDate)}`;
+
+    const worksheetData = [[title], headerRow];
+
+    dateRangeReport.rows.forEach(row => {
+      const dataRow = [
+        row.sno,
+        row.loomNo,
+        row.weaverName,
+        ...dateRangeReport.productColumns.map(name => row[name] || 0),
+        row.total || 0
+      ];
+      worksheetData.push(dataRow);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    applyCenterAlignment(ws);
+
+    if (columns.length > 1) {
+      ws['!merges'] = [
+        {
+          s: { r: 0, c: 0 },
+          e: { r: 0, c: columns.length - 1 }
+        }
+      ];
+    }
+
+    ws['!cols'] = columns.map(() => ({ wch: 15 }));
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Date Range Report');
+
+    const filename = `PCS_Delivery_${formatDateForExcel(dateRangeReport.startDate)}_to_${formatDateForExcel(dateRangeReport.endDate)}.xlsx`;
+    XLSX.writeFile(wb, filename);
+  };
+
   // Export to Excel
   const handleExportToExcel = () => {
     if (filteredReceipts.length === 0) {
@@ -309,23 +631,15 @@ const Reports = () => {
     }
 
     // Prepare data for Excel
-    const baseColumns = getBaseColumns();
-    const productColumns = products.map(p => p.name);
-    const allColumns = [...baseColumns, ...productColumns];
+    const baseColumns = [...BASE_COLUMN_SEQUENCE];
+    const productColumns = getOrderedProductColumns(products);
+    const allColumns = [...baseColumns, ...productColumns, SUB_TOTAL_COLUMN_KEY];
 
     // Create worksheet data
     const worksheetData = [];
 
     // Add header row
-    const headerRow = allColumns.map(col => {
-      if (col === 'date') return 'DATE';
-      if (col === 'receiptNo') return 'RECEIPT NO';
-      if (col === 'supervisorId') return 'SUPERVISOR ID';
-      if (col === 'weaverId') return 'LOOM NO';
-      if (col === 'weaverName') return 'NAME';
-      if (col === 'product') return 'PRODUCT';
-      return col.toUpperCase();
-    });
+    const headerRow = allColumns.map(col => getColumnLabel(col));
     worksheetData.push(headerRow);
 
     // Add data rows
@@ -342,6 +656,7 @@ const Reports = () => {
     // Create workbook and worksheet
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    applyCenterAlignment(ws);
 
     // Set column widths
     const colWidths = allColumns.map(() => ({ wch: 15 }));
@@ -384,13 +699,42 @@ const Reports = () => {
 
   // Get all column names for table
   const getTableColumns = () => {
-    const baseColumns = getBaseColumns();
-    const productColumns = products.map(p => p.name);
-    return [...baseColumns, ...productColumns];
+    return getAllReportColumns(products);
   };
 
   const tableColumns = getTableColumns();
+  const dateRangeColumns = ['sno', 'loomNo', 'weaverName', ...dateRangeReport.productColumns, 'total'];
+  const reportOptions = [
+    {
+      key: 'supervisor',
+      title: 'Supervisor Report',
+      description: 'Filter and review receipts recorded across the looms.'
+    },
+    {
+      key: 'dateRange',
+      title: 'Date to Date Report',
+      description: 'Summarize PCS delivery counts between two dates.'
+    },
+    {
+      key: 'delete',
+      title: 'Delete Receipts',
+      description: 'Remove receipts within a specified receipt number range.'
+    }
+  ];
   const hasActiveFilters = filters.startDate || filters.endDate || filters.supervisorId || filters.weaverId || filters.receiptId;
+  const canDownloadSupervisorReport = activeReportView === 'supervisor' && !loading && filteredReceipts.length > 0;
+  const canDownloadDateRangeReport = activeReportView === 'dateRange' && dateRangeReport.rows.length > 0;
+  const canDownloadReport = canDownloadSupervisorReport || canDownloadDateRangeReport;
+
+  const handleDownloadReport = () => {
+    if (canDownloadSupervisorReport) {
+      handleExportToExcel();
+      return;
+    }
+    if (canDownloadDateRangeReport) {
+      handleDateRangeReportDownload();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -419,7 +763,51 @@ const Reports = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
-        {/* Filters Section */}
+        {/* Report Type Selector */}
+        <div className="bg-white rounded-xl shadow-md mb-6">
+          <div className="p-4 md:p-6 border-b border-slate-200">
+            <h2 className="text-lg md:text-xl font-bold text-blue-900">Choose Report</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Select the view you need.
+            </p>
+          </div>
+          <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {reportOptions.map((option) => {
+              const isActive = activeReportView === option.key;
+              return (
+                <button
+                  key={option.key}
+                  onClick={() => {
+                    setActiveReportView(option.key);
+                    if (option.key === 'dateRange') {
+                      setDateRangeError('');
+                    }
+                  }}
+                  className={`text-left border rounded-2xl p-4 transition-all focus:outline-none ${
+                    isActive
+                      ? 'border-orange-500 bg-orange-50 shadow-lg'
+                      : 'border-slate-200 hover:border-orange-300 hover:shadow-md'
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                    {option.key === 'supervisor' ? 'Primary' : 'Summary'}
+                  </p>
+                  <h3 className="text-lg font-semibold text-blue-900">{option.title}</h3>
+                  <p className="text-sm text-slate-600 mt-1">{option.description}</p>
+                  {isActive && (
+                    <span className="inline-flex mt-3 text-xs font-semibold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full">
+                      Selected
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {activeReportView === 'supervisor' && (
+          <>
+            {/* Filters Section */}
         <div className="bg-white rounded-xl shadow-md mb-6">
           <div className="p-4 md:p-6 border-b border-slate-200">
             <div className="flex items-center justify-between">
@@ -484,10 +872,10 @@ const Reports = () => {
                   />
                 </div>
 
-                {/* Loom ID (Weaver ID) */}
+                    {/* Loom No */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Loom ID (Weaver ID)
+                        Loom No
                   </label>
                   <input
                     type="text"
@@ -570,13 +958,7 @@ const Reports = () => {
                         key={columnName}
                         className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider"
                       >
-                        {columnName === 'date' ? 'DATE' :
-                         columnName === 'receiptNo' ? 'RECEIPT NO' :
-                         columnName === 'supervisorId' ? 'SUPERVISOR ID' :
-                         columnName === 'weaverId' ? 'LOOM NO' :
-                         columnName === 'weaverName' ? 'NAME' :
-                         columnName === 'product' ? 'PRODUCT' :
-                         columnName.toUpperCase()}
+                            {getColumnLabel(columnName)}
                       </th>
                     ))}
                   </tr>
@@ -587,7 +969,7 @@ const Reports = () => {
                       {tableColumns.map((columnName) => (
                         <td key={columnName} className="px-4 py-4 whitespace-nowrap">
                           <span className="text-sm text-slate-700">
-                            {getFieldValue(receipt, columnName) || '-'}
+                                {getDisplayValue(getFieldValue(receipt, columnName))}
                           </span>
                         </td>
                       ))}
@@ -604,15 +986,9 @@ const Reports = () => {
                   {tableColumns.slice(0, 5).map((columnName) => (
                     <div key={columnName}>
                       <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
-                        {columnName === 'date' ? 'DATE' :
-                         columnName === 'receiptNo' ? 'RECEIPT NO' :
-                         columnName === 'supervisorId' ? 'SUPERVISOR ID' :
-                         columnName === 'weaverId' ? 'LOOM NO' :
-                         columnName === 'weaverName' ? 'NAME' :
-                         columnName === 'product' ? 'PRODUCT' :
-                         columnName.toUpperCase()}
-                      </p>
-                      <p className="text-sm text-slate-700">{getFieldValue(receipt, columnName) || '-'}</p>
+                            {getColumnLabel(columnName)}
+                          </p>
+                          <p className="text-sm text-slate-700">{getDisplayValue(getFieldValue(receipt, columnName))}</p>
                     </div>
                   ))}
                   {tableColumns.length > 5 && (
@@ -624,9 +1000,9 @@ const Reports = () => {
                         {tableColumns.slice(5).map((columnName) => (
                           <div key={columnName}>
                             <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
-                              {columnName.toUpperCase()}
+                                  {getColumnLabel(columnName)}
                             </p>
-                            <p className="text-sm text-slate-700">{getFieldValue(receipt, columnName) || '-'}</p>
+                                <p className="text-sm text-slate-700">{getDisplayValue(getFieldValue(receipt, columnName))}</p>
                           </div>
                         ))}
                       </div>
@@ -634,20 +1010,211 @@ const Reports = () => {
                   )}
                 </div>
               ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeReportView === 'dateRange' && (
+          <div className="bg-white rounded-xl shadow-md">
+            <div className="p-4 md:p-6 border-b border-slate-200">
+              <h2 className="text-lg md:text-xl font-bold text-blue-900">Date to Date Report</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Review PCS delivery totals across a chosen period.
+              </p>
+            </div>
+            <div className="p-4 md:p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateRangeInputs.start}
+                    onChange={(e) => handleDateRangeInputChange('start', e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateRangeInputs.end}
+                    onChange={(e) => handleDateRangeInputChange('end', e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+              </div>
+              {dateRangeError && (
+                <p className="text-sm text-red-600">{dateRangeError}</p>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={generateDateRangeReport}
+                  className="px-3 py-2 rounded-lg bg-orange-600 text-white font-medium hover:bg-orange-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-sm w-full sm:w-auto"
+                  disabled={dateRangeLoading}
+                >
+                  {dateRangeLoading ? 'Generating...' : 'Generate Report'}
+                </button>
+              </div>
+            </div>
+            <div className="border-t border-slate-200">
+              {dateRangeReport.generated ? (
+                dateRangeReport.rows.length === 0 ? (
+                  <div className="p-6 text-center text-slate-500">
+                    No data found for the selected date range.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          {dateRangeColumns.map((column) => (
+                            <th
+                              key={column}
+                              className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                            >
+                              {getColumnLabel(column)}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {dateRangeReport.rows.map((row) => (
+                          <tr key={`${row.loomNo}-${row.weaverName}`} className="hover:bg-slate-50 transition-colors">
+                            {dateRangeColumns.map((column) => (
+                              <td key={column} className="px-4 py-3 whitespace-nowrap">
+                                <span className="text-sm text-slate-700">
+                                  {getDisplayValue(getRangeFieldValue(row, column))}
+                                </span>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : (
+                <div className="p-6 text-center text-slate-500">
+                  Select the date range and click "Generate Report" to view the summary.
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Export to Excel Button - Bottom Right Corner */}
-        {!loading && filteredReceipts.length > 0 && (
+        {activeReportView === 'delete' && (
+          <div className="bg-white rounded-xl shadow-md">
+            <div className="p-4 md:p-6 border-b border-slate-200">
+              <h2 className="text-lg md:text-xl font-bold text-blue-900">Delete Receipts</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Remove receipts by providing the starting and ending receipt numbers.
+              </p>
+            </div>
+            <div className="p-4 md:p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Start Receipt No
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteRangeInputs.start}
+                    onChange={(e) => handleDeleteRangeInputChange('start', e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="e.g., 1001"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    End Receipt No
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteRangeInputs.end}
+                    onChange={(e) => handleDeleteRangeInputChange('end', e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="e.g., 1050"
+                  />
+                </div>
+              </div>
+              {deleteRangeStatus.message && (
+                <div
+                  className={`text-sm rounded-lg px-3 py-2 ${
+                    deleteRangeStatus.type === 'success'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : deleteRangeStatus.type === 'error'
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'bg-slate-50 text-slate-600 border border-slate-200'
+                  }`}
+                >
+                  {deleteRangeStatus.message}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleDeleteReceipts}
+                  className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-sm w-full sm:w-auto"
+                  disabled={deleteRangeLoading}
+                >
+                  {deleteRangeLoading ? 'Deleting...' : 'Delete Receipts'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {deleteConfirmData && (
+          <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-blue-900">Confirm Deletion</h3>
+                <button
+                  onClick={cancelDeleteConfirmation}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-sm text-slate-600 mb-4">
+                You are about to delete {deleteConfirmData.receipts.length} receipt(s) from{' '}
+                <span className="font-semibold">{deleteConfirmData.start}</span> to{' '}
+                <span className="font-semibold">{deleteConfirmData.end}</span>. This action cannot be undone.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={cancelDeleteConfirmation}
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                  disabled={deleteRangeLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteReceipts}
+                  className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={deleteRangeLoading}
+                >
+                  {deleteRangeLoading ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {canDownloadReport && (
           <div className="fixed bottom-6 right-6 z-50">
             <button
-              onClick={handleExportToExcel}
+              onClick={handleDownloadReport}
               className="bg-orange-600 text-white px-4 md:px-6 py-3 rounded-lg font-medium shadow-lg transition-all hover:bg-orange-700 hover:shadow-xl flex items-center gap-2"
-              title="Export to Excel"
+              title="Download Report"
             >
               <Download size={20} />
-              <span className="hidden sm:inline">Export to Excel</span>
+              <span className="hidden sm:inline">Download Report</span>
             </button>
           </div>
         )}
