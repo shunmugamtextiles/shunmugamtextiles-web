@@ -85,7 +85,7 @@ const About = () => {
                 <div className="w-40 h-40 md:w-48 md:h-48 rounded-lg overflow-hidden border-2 border-slate-200 shadow-md flex items-center justify-center p-2">
                   <img
                     src="/Mythies Kumar.jpg"
-                    alt="S. Mythirei Kumar"
+                    alt="S. Mythies Kumar"
                     className="w-full h-full object-contain"
                     onError={(e) => {
                       e.target.src = '/logo.jpg';
@@ -93,7 +93,7 @@ const About = () => {
                   />
                 </div>
                 <div className="text-center">
-                  <p className="text-lg md:text-xl font-semibold text-blue-900">S. Mythirei Kumar</p>
+                  <p className="text-lg md:text-xl font-semibold text-blue-900">S. Mythies Kumar</p>
                   <p className="text-sm md:text-base text-slate-600">Executive Director</p>
                 </div>
               </div>

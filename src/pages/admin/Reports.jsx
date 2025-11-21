@@ -721,6 +721,16 @@ const Reports = () => {
 
   const tableColumns = getTableColumns();
   const dateRangeColumns = ['sno', 'loomNo', 'weaverName', ...dateRangeReport.productColumns, 'total'];
+
+  // Grand totals for last column
+  const supervisorGrandTotal = filteredReceipts.reduce(
+    (sum, receipt) => sum + Number(calculateSubTotal(receipt) || 0),
+    0
+  );
+  const dateRangeGrandTotal = dateRangeReport.rows.reduce(
+    (sum, row) => sum + Number(row.total || 0),
+    0
+  );
   const reportOptions = [
     {
       key: 'supervisor',
@@ -962,6 +972,16 @@ const Reports = () => {
                         {hasActiveFilters && ' (filtered)'}
                       </p>
                     </div>
+                    {canDownloadSupervisorReport && (
+                      <button
+                        onClick={handleDownloadReport}
+                        className="bg-orange-600 text-white px-4 md:px-6 py-2 rounded-lg text-sm font-medium shadow-md transition-all hover:bg-orange-700 hover:shadow-lg flex items-center gap-2"
+                        title="Download Supervisor Report"
+                      >
+                        <Download size={18} />
+                        <span className="hidden sm:inline">Download Report</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -993,6 +1013,21 @@ const Reports = () => {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot className="bg-slate-100">
+                      <tr>
+                        <td
+                          colSpan={tableColumns.length - 1}
+                          className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                        >
+                          GRAND TOTAL
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm font-semibold text-blue-900">
+                            {supervisorGrandTotal}
+                          </span>
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
 
@@ -1086,35 +1121,64 @@ const Reports = () => {
                     No data found for the selected date range.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          {dateRangeColumns.map((column) => (
-                            <th
-                              key={column}
-                              className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider"
-                            >
-                              {getColumnLabel(column)}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {dateRangeReport.rows.map((row) => (
-                          <tr key={`${row.loomNo}-${row.weaverName}`} className="hover:bg-slate-50 transition-colors">
+                  <>
+                    <div className="px-4 md:px-6 py-3 flex justify-end">
+                      {canDownloadDateRangeReport && (
+                        <button
+                          onClick={handleDownloadReport}
+                          className="bg-orange-600 text-white px-4 md:px-6 py-2 rounded-lg text-sm font-medium shadow-md transition-all hover:bg-orange-700 hover:shadow-lg flex items-center gap-2"
+                          title="Download Date Range Report"
+                        >
+                          <Download size={18} />
+                          <span className="hidden sm:inline">Download Report</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-slate-50">
+                          <tr>
                             {dateRangeColumns.map((column) => (
-                              <td key={column} className="px-4 py-3 whitespace-nowrap">
-                                <span className="text-sm text-slate-700">
-                                  {getDisplayValue(getRangeFieldValue(row, column))}
-                                </span>
-                              </td>
+                              <th
+                                key={column}
+                                className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                              >
+                                {getColumnLabel(column)}
+                              </th>
                             ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {dateRangeReport.rows.map((row) => (
+                            <tr key={`${row.loomNo}-${row.weaverName}`} className="hover:bg-slate-50 transition-colors">
+                              {dateRangeColumns.map((column) => (
+                                <td key={column} className="px-4 py-3 whitespace-nowrap">
+                                  <span className="text-sm text-slate-700">
+                                    {getDisplayValue(getRangeFieldValue(row, column))}
+                                  </span>
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-slate-100">
+                          <tr>
+                            <td
+                              colSpan={dateRangeColumns.length - 1}
+                              className="px-4 py-3 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider"
+                            >
+                              GRAND TOTAL
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="text-sm font-semibold text-blue-900">
+                                {dateRangeGrandTotal}
+                              </span>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </>
                 )
               ) : (
                 <div className="p-6 text-center text-slate-500">
@@ -1223,18 +1287,6 @@ const Reports = () => {
           </div>
         )}
 
-        {canDownloadReport && (
-          <div className="fixed bottom-6 right-6 z-50">
-            <button
-              onClick={handleDownloadReport}
-              className="bg-orange-600 text-white px-4 md:px-6 py-3 rounded-lg font-medium shadow-lg transition-all hover:bg-orange-700 hover:shadow-xl flex items-center gap-2"
-              title="Download Report"
-            >
-              <Download size={20} />
-              <span className="hidden sm:inline">Download Report</span>
-            </button>
-          </div>
-        )}
       </main>
     </div>
   );
