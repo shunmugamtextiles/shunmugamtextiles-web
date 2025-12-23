@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Download, Filter, X } from 'lucide-react';
+import { ArrowLeft, FileText, Download, Filter, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import * as XLSX from 'xlsx';
@@ -42,6 +42,14 @@ const Reports = () => {
     receiptId: ''
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [supervisorSort, setSupervisorSort] = useState({
+    column: 'receiptNo',
+    direction: 'desc'
+  });
+  const [dateRangeSort, setDateRangeSort] = useState({
+    column: 'loomNo',
+    direction: 'asc'
+  });
 
   // Fetch supervisors from Firestore
   const fetchSupervisors = async () => {
@@ -172,8 +180,9 @@ const Reports = () => {
       });
     }
 
+    filtered = applySupervisorSort(filtered);
     setFilteredReceipts(filtered);
-  }, [filters, receipts]);
+  }, [filters, receipts, supervisorSort]);
 
   // Format date for display
   const formatDate = (date) => {
@@ -393,6 +402,117 @@ const Reports = () => {
 
   const getReceiptNumberFromRecord = (receipt) => {
     return receipt.receiptNo || receipt.receiptNumber || receipt.receipt_no || '';
+  };
+
+  const getSupervisorSortValue = (receipt, columnName) => {
+    if (!receipt) return '';
+
+    if (columnName === 'date') {
+      const d = receipt.date
+        ? (receipt.date.toDate ? receipt.date.toDate() : new Date(receipt.date))
+        : null;
+      return d && !Number.isNaN(d.getTime()) ? d.getTime() : 0;
+    }
+
+    if (columnName === 'receiptNo') {
+      const raw = getReceiptNumberFromRecord(receipt) || '';
+      const num = Number(raw);
+      if (!Number.isNaN(num)) return num;
+      return raw.toString().toLowerCase();
+    }
+
+    if (columnName === 'supervisorId') {
+      return (receipt.supervisorId || receipt.supervisor_id || '').toString().toLowerCase();
+    }
+
+    if (columnName === 'weaverId' || columnName === 'loomNo') {
+      const loom =
+        receipt.weaverId ||
+        receipt.weaver_id ||
+        receipt.loomNo ||
+        receipt.loom_no ||
+        '';
+      const num = Number(loom);
+      if (!Number.isNaN(num)) return num;
+      return loom.toString().toLowerCase();
+    }
+
+    if (columnName === 'weaverName') {
+      return (receipt.weaverName || receipt.weaver_name || receipt.name || '').toString().toLowerCase();
+    }
+
+    if (columnName === SUB_TOTAL_COLUMN_KEY) {
+      return Number(calculateSubTotal(receipt)) || 0;
+    }
+
+    const value = receipt[columnName];
+    if (value === undefined || value === null) return '';
+    const num = Number(value);
+    if (!Number.isNaN(num)) return num;
+    return value.toString().toLowerCase();
+  };
+
+  const applySupervisorSort = (list, sortOverride) => {
+    const sortState = sortOverride || supervisorSort;
+    const { column, direction } = sortState;
+    if (!column) return [...list];
+
+    const sorted = [...list].sort((a, b) => {
+      const va = getSupervisorSortValue(a, column);
+      const vb = getSupervisorSortValue(b, column);
+
+      if (va < vb) return direction === 'asc' ? -1 : 1;
+      if (va > vb) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  };
+
+  const getDateRangeSortValue = (row, columnName) => {
+    if (!row) return '';
+
+    if (columnName === 'sno') {
+      return Number(row.sno) || 0;
+    }
+
+    if (columnName === 'loomNo') {
+      const loom = row.loomNo || '';
+      const num = Number(loom);
+      if (!Number.isNaN(num)) return num;
+      return loom.toString().toLowerCase();
+    }
+
+    if (columnName === 'weaverName') {
+      return (row.weaverName || '').toString().toLowerCase();
+    }
+
+    if (columnName === 'total') {
+      return Number(row.total) || 0;
+    }
+
+    const value = row[columnName];
+    if (value === undefined || value === null) return '';
+    const num = Number(value);
+    if (!Number.isNaN(num)) return num;
+    return value.toString().toLowerCase();
+  };
+
+  const applyDateRangeSort = (rows, sortOverride) => {
+    const sortState = sortOverride || dateRangeSort;
+    const { column, direction } = sortState;
+    if (!column) return [...rows];
+
+    const sorted = [...rows].sort((a, b) => {
+      const va = getDateRangeSortValue(a, column);
+      const vb = getDateRangeSortValue(b, column);
+
+      if (va < vb) return direction === 'asc' ? -1 : 1;
+      if (va > vb) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
   };
 
   const handleDeleteRangeInputChange = (field, value) => {
@@ -705,6 +825,14 @@ const Reports = () => {
   const tableColumns = getTableColumns();
   const dateRangeColumns = ['sno', 'loomNo', 'weaverName', ...dateRangeReport.productColumns, 'total'];
 
+  const isProductColumn = (columnName) => {
+    return products.some((p) => p.name === columnName);
+  };
+
+  const isDateRangeProductColumn = (columnName) => {
+    return dateRangeReport.productColumns.includes(columnName);
+  };
+
   // Grand totals for last column
   const supervisorGrandTotal = filteredReceipts.reduce(
     (sum, receipt) => sum + Number(calculateSubTotal(receipt) || 0),
@@ -744,6 +872,21 @@ const Reports = () => {
     if (canDownloadDateRangeReport) {
       handleDateRangeReportDownload();
     }
+  };
+
+  const handleSupervisorSortClick = (columnName, direction) => {
+    const sortState = { column: columnName, direction };
+    setSupervisorSort(sortState);
+    setFilteredReceipts((prev) => applySupervisorSort(prev, sortState));
+  };
+
+  const handleDateRangeSortClick = (columnName, direction) => {
+    const sortState = { column: columnName, direction };
+    setDateRangeSort(sortState);
+    setDateRangeReport((prev) => ({
+      ...prev,
+      rows: applyDateRangeSort(prev.rows, sortState)
+    }));
   };
 
   return (
@@ -978,7 +1121,37 @@ const Reports = () => {
                         key={columnName}
                         className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider"
                       >
-                        {getColumnLabel(columnName)}
+                        <div className="flex items-center gap-1">
+                          <span>{getColumnLabel(columnName)}</span>
+                          {!isProductColumn(columnName) && (
+                            <span className="flex flex-col -space-y-1 ml-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSupervisorSortClick(columnName, 'asc')}
+                                className={`p-0.5 hover:text-blue-900 ${
+                                  supervisorSort.column === columnName &&
+                                  supervisorSort.direction === 'asc'
+                                    ? 'text-blue-900'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                <ArrowUp size={10} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSupervisorSortClick(columnName, 'desc')}
+                                className={`p-0.5 hover:text-blue-900 ${
+                                  supervisorSort.column === columnName &&
+                                  supervisorSort.direction === 'desc'
+                                    ? 'text-blue-900'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                <ArrowDown size={10} />
+                              </button>
+                            </span>
+                          )}
+                        </div>
                       </th>
                     ))}
                   </tr>
@@ -1126,7 +1299,37 @@ const Reports = () => {
                                 key={column}
                                 className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider"
                               >
-                                {getColumnLabel(column)}
+                                <div className="flex items-center gap-1">
+                                  <span>{getColumnLabel(column)}</span>
+                                  {!isDateRangeProductColumn(column) && (
+                                    <span className="flex flex-col -space-y-1 ml-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDateRangeSortClick(column, 'asc')}
+                                        className={`p-0.5 hover:text-blue-900 ${
+                                          dateRangeSort.column === column &&
+                                          dateRangeSort.direction === 'asc'
+                                            ? 'text-blue-900'
+                                            : 'text-slate-400'
+                                        }`}
+                                      >
+                                        <ArrowUp size={10} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDateRangeSortClick(column, 'desc')}
+                                        className={`p-0.5 hover:text-blue-900 ${
+                                          dateRangeSort.column === column &&
+                                          dateRangeSort.direction === 'desc'
+                                            ? 'text-blue-900'
+                                            : 'text-slate-400'
+                                        }`}
+                                      >
+                                        <ArrowDown size={10} />
+                                      </button>
+                                    </span>
+                                  )}
+                                </div>
                               </th>
                             ))}
                           </tr>

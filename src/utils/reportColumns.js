@@ -13,10 +13,24 @@ export const getOrderedProductColumns = (products = []) => {
     return [];
   }
 
+  // Sort by serialNo (ascending), then by name for stability/fallback
+  const sorted = [...products].sort((a, b) => {
+    const aSerial = Number(a?.serialNo);
+    const bSerial = Number(b?.serialNo);
+    const aHas = !Number.isNaN(aSerial);
+    const bHas = !Number.isNaN(bSerial);
+
+    if (aHas && bHas && aSerial !== bSerial) return aSerial - bSerial;
+    if (aHas && !bHas) return -1;
+    if (!aHas && bHas) return 1;
+
+    return (a?.name || '').localeCompare(b?.name || '');
+  });
+
   const seen = new Set();
   const orderedColumns = [];
 
-  products.forEach((product) => {
+  sorted.forEach((product) => {
     const name = (product?.name || '').trim();
     if (!name) return;
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Package, Plus, Trash2, Edit2, X, AlertCircle, CheckCircle, Upload, Image as ImageIcon } from 'lucide-react';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
@@ -101,6 +101,7 @@ const AdminProducts = () => {
     cancelText: 'Cancel'
   });
   const [submitting, setSubmitting] = useState(false);
+  const formRef = useRef(null);
 
   // Fetch products from Firestore
   const fetchProducts = async () => {
@@ -111,6 +112,20 @@ const AdminProducts = () => {
         id: doc.id,
         ...doc.data()
       }));
+
+      // Ensure stable ordering by serialNo (ascending), fallback to createdAt, then name
+      productsList.sort((a, b) => {
+        const aSerial = Number(a.serialNo);
+        const bSerial = Number(b.serialNo);
+        if (!Number.isNaN(aSerial) && !Number.isNaN(bSerial)) return aSerial - bSerial;
+        if (!Number.isNaN(aSerial)) return -1;
+        if (!Number.isNaN(bSerial)) return 1;
+        const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (aDate !== bDate) return aDate - bDate;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
       setProducts(productsList);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -118,6 +133,16 @@ const AdminProducts = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getNextSerialNo = () => {
+    if (!products || products.length === 0) return 1;
+    const maxSerial = products.reduce((max, p) => {
+      const val = Number(p.serialNo);
+      if (Number.isNaN(val)) return max;
+      return Math.max(max, val);
+    }, 0);
+    return maxSerial + 1;
   };
 
   useEffect(() => {
@@ -210,12 +235,21 @@ const AdminProducts = () => {
     setFormData({
       name: product.name,
       imageUrl: product.imageUrl || '',
-      status: product.status || 'in stock'
+      status: product.status || 'in stock',
+      serialNo: product.serialNo
     });
     setImagePreview(product.imageUrl || '');
     setImageFile(null);
     setShowEditForm(true);
     setShowAddForm(false);
+    // Scroll to the form when editing is triggered
+    setTimeout(() => {
+      if (formRef.current) {
+        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 0);
   };
 
   // Handle form submission (both add and edit)
@@ -263,11 +297,12 @@ const AdminProducts = () => {
           }
         }
 
-        // Update in Firestore
+        // Update in Firestore (serialNo stays unchanged)
         await updateDoc(doc(db, 'products', editingProduct.id), {
           name: formData.name,
           imageUrl: finalImageUrl,
           status: formData.status,
+          serialNo: editingProduct.serialNo,
           updatedAt: new Date().toISOString()
         });
 
@@ -284,11 +319,13 @@ const AdminProducts = () => {
           return;
         }
 
-        // Add to Firestore
+        // Add to Firestore with serialNo
+        const serialNo = getNextSerialNo();
         await addDoc(collection(db, 'products'), {
           name: formData.name,
           imageUrl: finalImageUrl,
           status: formData.status,
+          serialNo,
           createdAt: new Date().toISOString()
         });
 
@@ -336,7 +373,7 @@ const AdminProducts = () => {
 
   // Reset form
   const resetForm = () => {
-    setFormData({ name: '', imageUrl: '', status: 'in stock' });
+    setFormData({ name: '', imageUrl: '', status: 'in stock', serialNo: undefined });
     setImageFile(null);
     setImagePreview('');
     setShowAddForm(false);
@@ -400,13 +437,16 @@ const AdminProducts = () => {
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
         {/* Add/Edit Product Form */}
         {(showAddForm || showEditForm) && (
-          <div className="bg-white rounded-xl shadow-md p-4 md:p-6 mb-4 md:mb-6">
+          <div
+            ref={formRef}
+            className="bg-white rounded-xl shadow-md p-4 md:p-6 mb-4 md:mb-6"
+          >
             <h2 className="text-lg md:text-xl font-bold text-blue-900 mb-4">
               {showEditForm ? 'Edit Product' : 'Add New Product'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                <div className="md:col-span-2">
                   <label htmlFor="name" className="block text-sm font-semibold text-slate-700 mb-2">
                     Product Name *
                   </label>
@@ -419,6 +459,22 @@ const AdminProducts = () => {
                     className="w-full px-4 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-purple-600 focus:ring-4 focus:ring-purple-600/10"
                     placeholder="Enter product name"
                     required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    S.NO (auto)
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      showEditForm && editingProduct
+                        ? editingProduct.serialNo ?? ''
+                        : formData.serialNo ?? ''
+                    }
+                    readOnly
+                    className="w-full px-4 py-2 border-2 border-slate-200 rounded-lg bg-slate-50 text-slate-600"
+                    placeholder={showEditForm ? 'N/A' : 'Will be assigned'}
                   />
                 </div>
                 <div>
@@ -553,6 +609,9 @@ const AdminProducts = () => {
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                        S.NO
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
                         Image
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
@@ -570,8 +629,11 @@ const AdminProducts = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {products.map((product) => (
+                    {products.map((product, index) => (
                       <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
+                          {index + 1}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {product.imageUrl ? (
                             <img
@@ -636,7 +698,7 @@ const AdminProducts = () => {
 
               {/* Mobile Card View */}
               <div className="md:hidden space-y-4">
-                {products.map((product) => (
+                {products.map((product, index) => (
                   <div key={product.id} className="bg-white border-2 border-slate-200 rounded-lg p-4 space-y-3">
                     <div className="flex items-start gap-3">
                       {product.imageUrl ? (
@@ -654,6 +716,9 @@ const AdminProducts = () => {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">
+                          S.NO: <span className="font-semibold text-slate-700">{index + 1}</span>
+                        </p>
                         <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Product Name</p>
                         <p className="font-semibold text-purple-900 truncate">{product.name}</p>
                         <span
