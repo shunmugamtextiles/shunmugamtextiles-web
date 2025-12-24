@@ -1,17 +1,50 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 const Home = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const productImages = [
-    '/product1.jpg',
-    '/product2.jpg',
-    '/product3.jpg',
-    '/product4.jpg'
-  ];
+  const [productImages, setProductImages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchProductImages = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'products'));
+        const productsList = querySnapshot.docs.map(doc => doc.data());
+
+        productsList.sort((a, b) => {
+          const aSerial = Number(a.serialNo);
+          const bSerial = Number(b.serialNo);
+          if (!Number.isNaN(aSerial) && !Number.isNaN(bSerial)) return aSerial - bSerial;
+          return 0;
+        });
+
+        const imageUrls = productsList.slice(0, 4).map(p => p.imageUrl).filter(Boolean);
+        
+        if (imageUrls.length > 0) {
+          setProductImages(imageUrls);
+        } else {
+          // Fallback to static images if no products are found
+          setProductImages(['/product1.jpg', '/product2.jpg', '/product3.jpg', '/product4.jpg']);
+        }
+      } catch (error) {
+        console.error("Error fetching product images for carousel:", error);
+        // Fallback to static images if fetch fails
+        setProductImages(['/product1.jpg', '/product2.jpg', '/product3.jpg', '/product4.jpg']);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProductImages();
+  }, []);
+
+  useEffect(() => {
+    if (productImages.length === 0) return;
+
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % productImages.length);
     }, 3000); // Change image every 3 seconds
@@ -40,35 +73,45 @@ const Home = () => {
             </div>
           </div>
           <div className="flex justify-center items-center">
-            <div className="w-full h-64 md:h-80 lg:h-96 rounded-xl overflow-hidden border-2 border-white/30 shadow-2xl relative">
-              {productImages.map((image, index) => (
-                <img
-                  key={index}
-                  src={image}
-                  alt={`Product ${index + 1}`}
-                  className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
-                    index === currentImageIndex ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              ))}
-              {/* Image Indicators */}
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-                {productImages.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`w-2 h-2 rounded-full transition-all ${
-                      index === currentImageIndex
-                        ? 'bg-white w-8'
-                        : 'bg-white/50 hover:bg-white/75'
-                    }`}
-                    aria-label={`Go to product ${index + 1}`}
-                  />
-                ))}
-              </div>
+            <div className="w-full h-64 md:h-80 lg:h-96 rounded-xl overflow-hidden border-2 border-white/30 shadow-2xl relative bg-blue-800">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                </div>
+              ) : (
+                <>
+                  {productImages.map((image, index) => (
+                    <img
+                      key={index}
+                      src={image}
+                      alt={`Product ${index + 1}`}
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+                        index === currentImageIndex ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ))}
+                  {/* Image Indicators */}
+                  {productImages.length > 1 && (
+                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
+                      {productImages.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            index === currentImageIndex
+                              ? 'bg-white w-8'
+                              : 'bg-white/50 hover:bg-white/75'
+                          }`}
+                          aria-label={`Go to product ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
