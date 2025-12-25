@@ -13,7 +13,8 @@ dist-ssr
 *.local
 FIREBASE_SETUP.md
 RENDER_DEPLOYMENT.md
-
+ADMIN_SYSTEM.md
+QUICK_START.md
 # Environment variables
 .env
 .env.local
