@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, FileText, Download, Filter, X, ArrowUp, ArrowDown } from 'lucide-react';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import * as XLSX from 'xlsx-js-style';
 import {
@@ -16,6 +16,7 @@ const Reports = () => {
     const [filteredReceipts, setFilteredReceipts] = useState([]);
     const [products, setProducts] = useState([]);
     const [supervisors, setSupervisors] = useState([]);
+    const [weavers, setWeavers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeReportView, setActiveReportView] = useState('supervisor');
     const [dateRangeInputs, setDateRangeInputs] = useState({ start: '', end: '' });
@@ -33,7 +34,7 @@ const Reports = () => {
     const [deleteRangeLoading, setDeleteRangeLoading] = useState(false);
     const [deleteConfirmData, setDeleteConfirmData] = useState(null);
 
-    // Filter states (same as admin - includes supervisorId)
+    // Filter states
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
@@ -41,7 +42,7 @@ const Reports = () => {
         weaverId: '',
         receiptId: ''
     });
-    const [showFilters, setShowFilters] = useState(false);
+    const [showFilters, setShowFilters] = useState(true);
     const [supervisorSort, setSupervisorSort] = useState({
         column: 'receiptNo',
         direction: 'desc'
@@ -67,6 +68,22 @@ const Reports = () => {
         }
     };
 
+    // Fetch weavers from Firestore
+    const fetchWeavers = async () => {
+        try {
+            const querySnapshot = await getDocs(collection(db, 'weavers'));
+            const weaversList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setWeavers(weaversList);
+            return weaversList;
+        } catch (error) {
+            console.error('Error fetching weavers:', error);
+            return [];
+        }
+    };
+
     // Fetch products from Firestore
     const fetchProducts = async () => {
         try {
@@ -85,18 +102,17 @@ const Reports = () => {
         }
     };
 
-    // Fetch receipts from Firestore (all receipts, not filtered by supervisor)
+    // Fetch receipts from Firestore
     const fetchReceipts = async () => {
         try {
             setLoading(true);
             await Promise.all([
                 fetchProducts(),
-                fetchSupervisors()
+                fetchSupervisors(),
+                fetchWeavers()
             ]);
 
-            // Query all receipts (not filtered by supervisor ID)
             const querySnapshot = await getDocs(collection(db, 'receipts'));
-
             const receiptsList = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
@@ -110,6 +126,7 @@ const Reports = () => {
             });
 
             setReceipts(receiptsList);
+            // Default show all fetched receipts
             setFilteredReceipts(receiptsList);
         } catch (error) {
             console.error('Error fetching receipts:', error);
@@ -126,6 +143,14 @@ const Reports = () => {
 
     // Apply filters
     useEffect(() => {
+        // Removing mandatory date check so supervisor sees their data immediately
+        /* 
+        if (activeReportView === 'supervisor' && (!filters.startDate || !filters.endDate)) {
+            setFilteredReceipts([]);
+            return;
+        } 
+        */
+
         let filtered = [...receipts];
 
         // Filter by start date
@@ -182,7 +207,7 @@ const Reports = () => {
 
         filtered = applySupervisorSort(filtered);
         setFilteredReceipts(filtered);
-    }, [filters, receipts, supervisorSort]);
+    }, [filters, receipts, supervisorSort, activeReportView]);
 
     // Format date for display
     const formatDate = (date) => {
@@ -215,19 +240,6 @@ const Reports = () => {
         return `${year}-${month}-${day}`;
     };
 
-    const formatDisplayDate = (date) => {
-        if (!date) return 'N/A';
-        const d = date instanceof Date ? date : new Date(date);
-        if (Number.isNaN(d.getTime())) {
-            return 'N/A';
-        }
-        return d.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    };
-
     const applyCenterAlignment = (worksheet) => {
         if (!worksheet || !worksheet['!ref']) return;
         const range = XLSX.utils.decode_range(worksheet['!ref']);
@@ -243,6 +255,19 @@ const Reports = () => {
                 }
             }
         }
+    };
+
+    const formatDisplayDate = (date) => {
+        if (!date) return 'N/A';
+        const d = date instanceof Date ? date : new Date(date);
+        if (Number.isNaN(d.getTime())) {
+            return 'N/A';
+        }
+        return d.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
     };
 
     // Parse products from receipt and return quantities by product name
@@ -328,7 +353,7 @@ const Reports = () => {
 
     const getColumnLabel = (columnName) => {
         if (columnName === 'date') return 'DATE';
-        if (columnName === 'receiptNo') return 'RECEIPT NO';
+        if (columnName === 'receiptNo') return 'REF NO';
         if (columnName === 'supervisorId') return 'SUPERVISOR ID';
         if (columnName === 'weaverId') return 'LOOM NO';
         if (columnName === 'loomNo') return 'LOOM';
@@ -547,6 +572,7 @@ const Reports = () => {
         const normalizedStart = start.toLowerCase();
         const normalizedEnd = end.toLowerCase();
         const normalizedValue = trimmedValue.toLowerCase();
+
         const startFirst = normalizedStart <= normalizedEnd;
         if (startFirst) {
             return normalizedValue >= normalizedStart && normalizedValue <= normalizedEnd;
@@ -577,6 +603,7 @@ const Reports = () => {
             receipts: matchingReceipts
         });
     };
+
 
     const confirmDeleteReceipts = async () => {
         if (!deleteConfirmData) return;
@@ -699,46 +726,111 @@ const Reports = () => {
         }
 
         const columns = ['sno', 'loomNo', 'weaverName', ...dateRangeReport.productColumns, 'total'];
+        // 1. Prepare Header Row
         const headerRow = columns.map(col => {
-            if (col === 'sno') return 'S NO';
-            if (col === 'loomNo') return 'LOOM';
-            if (col === 'weaverName') return 'WEAVER';
-            if (col === 'total') return 'TOTAL';
+            if (col === 'sno') return 'Sno';
+            if (col === 'loomNo') return 'Loom';
+            if (col === 'weaverName') return 'Weaver';
+            if (col === 'total') return 'Sub Total';
+            // For product columns, we might want them uppercased
             return col.toUpperCase();
         });
 
+        // 2. Prepare Title
         const title = `PCS DELIVERY FROM DATE : ${formatDisplayDate(dateRangeReport.startDate)} TO : ${formatDisplayDate(dateRangeReport.endDate)}`;
 
-        const worksheetData = [[title], headerRow];
-
-        dateRangeReport.rows.forEach(row => {
-            const dataRow = [
+        // 3. Build the Data Array
+        // Row 0: Title
+        // Row 1: Headers
+        // Row 2+: Data
+        const worksheetData = [
+            [title],
+            headerRow,
+            ...dateRangeReport.rows.map(row => [
                 row.sno,
                 row.loomNo,
                 row.weaverName,
                 ...dateRangeReport.productColumns.map(name => row[name] || 0),
                 row.total || 0
-            ];
-            worksheetData.push(dataRow);
-        });
+            ])
+        ];
 
+        // 4. Create Workbook & Worksheet
         const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-        applyCenterAlignment(ws);
+        const ws = XLSX.utils.aoa_to_sheet(worksheetData, { cellStyles: true });
 
+        // ---------------------------------------------------------
+        // 5. Apply Styles (Center Alignment) to ALL cells
+        // ---------------------------------------------------------
+        const range = XLSX.utils.decode_range(ws['!ref']);
+
+        // Loop through every cell in the range
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!ws[cellAddress]) continue; // skip empty cells if any
+
+                // Initialize style object if missing
+                if (!ws[cellAddress].s) ws[cellAddress].s = {};
+
+                // Apply Center Alignment to EVERYTHING
+                ws[cellAddress].s.alignment = {
+                    vertical: 'center',
+                    horizontal: 'center',
+                    wrapText: true // helps if header is long
+                };
+
+                // Font settings default
+                if (!ws[cellAddress].s.font) ws[cellAddress].s.font = { name: 'Calibri', sz: 11 };
+            }
+        }
+
+        // ---------------------------------------------------------
+        // 6. Special Handling: Title Row (Row 0)
+        // ---------------------------------------------------------
+        // Merge cells for title
         if (columns.length > 1) {
             ws['!merges'] = [
-                {
-                    s: { r: 0, c: 0 },
-                    e: { r: 0, c: columns.length - 1 }
-                }
+                { s: { r: 0, c: 0 }, e: { r: 0, c: columns.length - 1 } }
             ];
         }
 
-        ws['!cols'] = columns.map(() => ({ wch: 15 }));
+        // Title Styling: Bold, Larger Font
+        if (ws['A1']) {
+            ws['A1'].s = {
+                ...ws['A1'].s,
+                font: { name: 'Calibri', sz: 16, bold: true },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+        }
+        // ---------------------------------------------------------
+        // 7. Special Handling: Header Row (Row 1)
+        // ---------------------------------------------------------
 
+        const headerRowIndex = 1;
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex, c: C });
+            if (ws[cellAddress]) {
+                ws[cellAddress].s = {
+                    ...ws[cellAddress].s,
+                    font: { name: 'Calibri', sz: 11 } // Removed bold headers
+                };
+            }
+        }
+
+        // ---------------------------------------------------------
+        // 8. Column Widths
+        // ---------------------------------------------------------
+        // Sno: smaller, Others: default/wider
+        ws['!cols'] = columns.map((col, i) => {
+            if (col === 'sno') return { wch: 6 };
+            if (col === 'loomNo') return { wch: 10 };
+            if (col === 'weaverName') return { wch: 25 };
+            return { wch: 12 }; // default for product columns
+        });
+
+        // Append sheet and save
         XLSX.utils.book_append_sheet(wb, ws, 'Date Range Report');
-
         const filename = `PCS_Delivery_${formatDateForExcel(dateRangeReport.startDate)}_to_${formatDateForExcel(dateRangeReport.endDate)}.xlsx`;
         XLSX.writeFile(wb, filename);
     };
@@ -751,46 +843,131 @@ const Reports = () => {
         }
 
         // Prepare data for Excel
-        const baseColumns = [...BASE_COLUMN_SEQUENCE];
+        const baseColumns = [...BASE_COLUMN_SEQUENCE].filter(col => col !== 'supervisorId');
         const productColumns = getOrderedProductColumns(products);
         const allColumns = [...baseColumns, ...productColumns, SUB_TOTAL_COLUMN_KEY];
 
-        // Create worksheet data
-        const worksheetData = [];
+        // 1. Prepare Header Row
+        const headerRow = allColumns.map(col => {
+            if (col === 'receiptNo') return 'Ref.No';
+            if (col === 'supervisorId') return 'Supervisor ID';
+            if (col === 'weaverId') return 'Loom';
+            if (col === 'weaverName') return 'Weaver';
+            if (col === 'date') return 'Date';
+            if (col === SUB_TOTAL_COLUMN_KEY) return 'Sub Total';
+            return col.toUpperCase();
+        });
 
-        // Add header row
-        const headerRow = allColumns.map(col => getColumnLabel(col));
-        worksheetData.push(headerRow);
+        // 2. Prepare Title
+        const startDateStr = filters.startDate ? formatDateForExcel(filters.startDate) : 'ALL';
+        const endDateStr = filters.endDate ? formatDateForExcel(filters.endDate) : 'ALL';
+        // Format dates nicely for display if they are dates, otherwise keep as is
+        const displayStart = filters.startDate ? formatDisplayDate(new Date(filters.startDate)) : 'ALL';
+        const displayEnd = filters.endDate ? formatDisplayDate(new Date(filters.endDate)) : 'ALL';
 
-        // Add data rows
-        filteredReceipts.forEach(receipt => {
-            const row = allColumns.map(col => {
+        const title = `SUPERWISE - DATE : ${displayStart} TO : ${displayEnd}`;
+
+        // 3. Build the Data Array
+        // Row 0: Title
+        // Row 1: Headers
+        // Row 2+: Data
+        const bodyRows = filteredReceipts.map(receipt => {
+            return allColumns.map(col => {
                 if (col === 'date') {
                     return formatDateForExcel(receipt.date);
                 }
                 return getFieldValue(receipt, col);
             });
-            worksheetData.push(row);
         });
 
-        // Create workbook and worksheet
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-        applyCenterAlignment(ws);
+        const worksheetData = [
+            [title],
+            headerRow,
+            ...bodyRows
+        ];
 
-        // Set column widths
-        const colWidths = allColumns.map(() => ({ wch: 15 }));
-        ws['!cols'] = colWidths;
+        // 4. Create Workbook & Worksheet
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(worksheetData, { cellStyles: true });
+
+        // ---------------------------------------------------------
+        // 5. Apply Styles (Center Alignment) to ALL cells
+        // ---------------------------------------------------------
+        const range = XLSX.utils.decode_range(ws['!ref']);
+
+        // Loop through every cell
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!ws[cellAddress]) continue;
+
+                // Initialize style
+                if (!ws[cellAddress].s) ws[cellAddress].s = {};
+
+                // Apply Center Alignment
+                ws[cellAddress].s.alignment = {
+                    vertical: 'center',
+                    horizontal: 'center',
+                    wrapText: true
+                };
+
+                // Default font
+                if (!ws[cellAddress].s.font) ws[cellAddress].s.font = { name: 'Calibri', sz: 11 };
+            }
+        }
+
+        // ---------------------------------------------------------
+        // 6. Special Handling: Title Row (Row 0)
+        // ---------------------------------------------------------
+        // Merge cells for title
+        if (allColumns.length > 1) {
+            ws['!merges'] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: allColumns.length - 1 } }
+            ];
+        }
+
+        // Title Styling
+        if (ws['A1']) {
+            ws['A1'].s = {
+                ...ws['A1'].s,
+                font: { name: 'Calibri', sz: 16, bold: true },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+        }
+
+        // ---------------------------------------------------------
+        // 7. Special Handling: Header Row (Row 1)
+        // ---------------------------------------------------------
+
+        const headerRowIndex = 1;
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex, c: C });
+            if (ws[cellAddress]) {
+                ws[cellAddress].s = {
+                    ...ws[cellAddress].s,
+                    font: { name: 'Calibri', sz: 11 } // Removed bold
+                };
+            }
+        }
+
+        // ---------------------------------------------------------
+        // 8. Column Widths
+        // ---------------------------------------------------------
+        ws['!cols'] = allColumns.map((col) => {
+            if (col === 'receiptNo') return { wch: 8 }; // Ref.No
+            if (col === 'weaverId') return { wch: 8 };  // Loom
+            if (col === 'weaverName') return { wch: 20 }; // Weaver
+            if (col === 'date') return { wch: 12 };
+            return { wch: 12 };
+        });
 
         // Add worksheet to workbook
         XLSX.utils.book_append_sheet(wb, ws, 'Reports');
 
-        // Generate filename with date range if filters are applied
+        // Generate filename
         let filename = 'Reports';
         if (filters.startDate || filters.endDate) {
-            const start = filters.startDate ? formatDateForExcel(filters.startDate) : 'All';
-            const end = filters.endDate ? formatDateForExcel(filters.endDate) : 'All';
-            filename += `_${start}_to_${end}`;
+            filename += `_${startDateStr}_to_${endDateStr}`;
         }
         filename += '.xlsx';
 
@@ -846,17 +1023,17 @@ const Reports = () => {
         {
             key: 'supervisor',
             title: 'Supervisor Report',
-            description: 'Filter and review receipts recorded across the looms.'
+            description: 'Filter receipts, view product quantities and export full data.'
         },
         {
             key: 'dateRange',
             title: 'Date to Date Report',
-            description: 'Summarize PCS delivery counts between two dates.'
+            description: 'Generate PCS delivery summary between two dates and download it.'
         },
         {
             key: 'delete',
             title: 'Delete Receipts',
-            description: 'Remove receipts within a specified receipt number range.'
+            description: 'Remove receipts within a specific receipt number range.'
         }
     ];
     const hasActiveFilters = filters.startDate || filters.endDate || filters.supervisorId || filters.weaverId || filters.receiptId;
@@ -921,7 +1098,7 @@ const Reports = () => {
                     <div className="p-4 md:p-6 border-b border-slate-200">
                         <h2 className="text-lg md:text-xl font-bold text-blue-900">Choose Report</h2>
                         <p className="text-sm text-slate-600 mt-1">
-                            Select the view you need.
+                            Select the report type you want to view.
                         </p>
                     </div>
                     <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -937,8 +1114,8 @@ const Reports = () => {
                                         }
                                     }}
                                     className={`text-left border rounded-2xl p-4 transition-all focus:outline-none ${isActive
-                                            ? 'border-orange-500 bg-orange-50 shadow-lg'
-                                            : 'border-slate-200 hover:border-orange-300 hover:shadow-md'
+                                        ? 'border-orange-500 bg-orange-50 shadow-lg'
+                                        : 'border-slate-200 hover:border-orange-300 hover:shadow-md'
                                         }`}
                                 >
                                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
@@ -1128,9 +1305,9 @@ const Reports = () => {
                                                                         type="button"
                                                                         onClick={() => handleSupervisorSortClick(columnName, 'asc')}
                                                                         className={`p-0.5 hover:text-blue-900 ${supervisorSort.column === columnName &&
-                                                                                supervisorSort.direction === 'asc'
-                                                                                ? 'text-blue-900'
-                                                                                : 'text-slate-400'
+                                                                            supervisorSort.direction === 'asc'
+                                                                            ? 'text-blue-900'
+                                                                            : 'text-slate-400'
                                                                             }`}
                                                                     >
                                                                         <ArrowUp size={10} />
@@ -1139,9 +1316,9 @@ const Reports = () => {
                                                                         type="button"
                                                                         onClick={() => handleSupervisorSortClick(columnName, 'desc')}
                                                                         className={`p-0.5 hover:text-blue-900 ${supervisorSort.column === columnName &&
-                                                                                supervisorSort.direction === 'desc'
-                                                                                ? 'text-blue-900'
-                                                                                : 'text-slate-400'
+                                                                            supervisorSort.direction === 'desc'
+                                                                            ? 'text-blue-900'
+                                                                            : 'text-slate-400'
                                                                             }`}
                                                                     >
                                                                         <ArrowDown size={10} />
@@ -1226,7 +1403,7 @@ const Reports = () => {
                         <div className="p-4 md:p-6 border-b border-slate-200">
                             <h2 className="text-lg md:text-xl font-bold text-blue-900">Date to Date Report</h2>
                             <p className="text-sm text-slate-600 mt-1">
-                                Review PCS delivery totals across a chosen period.
+                                Generate PCS delivery summary for any custom date range.
                             </p>
                         </div>
                         <div className="p-4 md:p-6 space-y-4">
@@ -1304,9 +1481,9 @@ const Reports = () => {
                                                                                 type="button"
                                                                                 onClick={() => handleDateRangeSortClick(column, 'asc')}
                                                                                 className={`p-0.5 hover:text-blue-900 ${dateRangeSort.column === column &&
-                                                                                        dateRangeSort.direction === 'asc'
-                                                                                        ? 'text-blue-900'
-                                                                                        : 'text-slate-400'
+                                                                                    dateRangeSort.direction === 'asc'
+                                                                                    ? 'text-blue-900'
+                                                                                    : 'text-slate-400'
                                                                                     }`}
                                                                             >
                                                                                 <ArrowUp size={10} />
@@ -1315,9 +1492,9 @@ const Reports = () => {
                                                                                 type="button"
                                                                                 onClick={() => handleDateRangeSortClick(column, 'desc')}
                                                                                 className={`p-0.5 hover:text-blue-900 ${dateRangeSort.column === column &&
-                                                                                        dateRangeSort.direction === 'desc'
-                                                                                        ? 'text-blue-900'
-                                                                                        : 'text-slate-400'
+                                                                                    dateRangeSort.direction === 'desc'
+                                                                                    ? 'text-blue-900'
+                                                                                    : 'text-slate-400'
                                                                                     }`}
                                                                             >
                                                                                 <ArrowDown size={10} />
@@ -1375,7 +1552,7 @@ const Reports = () => {
                         <div className="p-4 md:p-6 border-b border-slate-200">
                             <h2 className="text-lg md:text-xl font-bold text-blue-900">Delete Receipts</h2>
                             <p className="text-sm text-slate-600 mt-1">
-                                Remove receipts by providing the starting and ending receipt numbers.
+                                Enter the receipt number range you want to remove. This action is irreversible.
                             </p>
                         </div>
                         <div className="p-4 md:p-6 space-y-4">
@@ -1408,10 +1585,10 @@ const Reports = () => {
                             {deleteRangeStatus.message && (
                                 <div
                                     className={`text-sm rounded-lg px-3 py-2 ${deleteRangeStatus.type === 'success'
-                                            ? 'bg-green-50 text-green-700 border border-green-200'
-                                            : deleteRangeStatus.type === 'error'
-                                                ? 'bg-red-50 text-red-700 border border-red-200'
-                                                : 'bg-slate-50 text-slate-600 border border-slate-200'
+                                        ? 'bg-green-50 text-green-700 border border-green-200'
+                                        : deleteRangeStatus.type === 'error'
+                                            ? 'bg-red-50 text-red-700 border border-red-200'
+                                            : 'bg-slate-50 text-slate-600 border border-slate-200'
                                         }`}
                                 >
                                     {deleteRangeStatus.message}
@@ -1443,7 +1620,7 @@ const Reports = () => {
                                 </button>
                             </div>
                             <p className="text-sm text-slate-600 mb-4">
-                                You are about to delete {deleteConfirmData.receipts.length} receipt(s) from{' '}
+                                This will permanently delete {deleteConfirmData.receipts.length} receipt(s) from{' '}
                                 <span className="font-semibold">{deleteConfirmData.start}</span> to{' '}
                                 <span className="font-semibold">{deleteConfirmData.end}</span>. This action cannot be undone.
                             </p>
@@ -1473,4 +1650,3 @@ const Reports = () => {
 };
 
 export default Reports;
-
