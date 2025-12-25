@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+FIREBASE_SETUP.md
+RENDER_DEPLOYMENT.md
 
 # Environment variables
 .env
