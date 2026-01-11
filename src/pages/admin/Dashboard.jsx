@@ -187,7 +187,7 @@ const Dashboard = () => {
     };
 
     const handleCredentialsUpdated = () => {
-        alert("Credentials updated successfully! Please login with new credentials.");
+        // alert("Credentials updated successfully! Please login with new credentials.");
         handleLogout();
     };
 
