@@ -23,7 +23,14 @@ const Login = () => {
 
         try {
             // First, check if it's admin login
-            if (userId === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+            // For admin check, we now use Firestore via adminUtils
+            // This allows us to seed the DB on first run if needed
+            // and supports dynamic updates
+            // Fetch credentials
+            const { getAdminCredentials } = await import('../utils/adminUtils');
+            const adminCreds = await getAdminCredentials();
+
+            if (adminCreds && userId === adminCreds.username && password === adminCreds.password) {
                 localStorage.setItem('isAdminLoggedIn', 'true');
                 localStorage.setItem('userRole', 'admin');
                 navigate('/admin/dashboard');

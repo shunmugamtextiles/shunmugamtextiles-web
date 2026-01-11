@@ -1,8 +1,121 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Users, Package, UserCheck, LogOut, FileText } from 'lucide-react';
+import { Users, Package, UserCheck, LogOut, FileText, User, ChevronDown, Key, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import { updateAdminCredentials } from '../../utils/adminUtils';
+
+// Modal Component for Change Credentials
+const ChangeCredentialsModal = ({ isOpen, onClose, onSuccess }) => {
+    const [formData, setFormData] = useState({
+        username: '',
+        password: '',
+        confirmPassword: ''
+    });
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    if (!isOpen) return null;
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords do not match");
+            setLoading(false);
+            return;
+        }
+
+        if (formData.password.length < 6) {
+            setError("Password must be at least 6 characters");
+            setLoading(false);
+            return;
+        }
+
+        try {
+            await updateAdminCredentials(formData.username, formData.password);
+            onSuccess();
+            onClose();
+        } catch (err) {
+            console.error(err);
+            setError("Failed to update credentials. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={onClose}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-slate-900">Change Admin Credentials</h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {error && (
+                    <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm flex items-center gap-2">
+                        <AlertCircle size={16} />
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">New Username</label>
+                        <input
+                            type="text"
+                            required
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            value={formData.username}
+                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
+                        <input
+                            type="password"
+                            required
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
+                        <input
+                            type="password"
+                            required
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            value={formData.confirmPassword}
+                            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-6">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                            {loading ? 'Updating...' : 'Update Credentials'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -12,6 +125,22 @@ const Dashboard = () => {
         products: 0,
         loading: true
     });
+
+    // Profile Dropdown State
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [showChangeCreds, setShowChangeCreds] = useState(false);
+    const dropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsProfileOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Fetch counts from Firestore
     const fetchStats = async () => {
@@ -57,6 +186,11 @@ const Dashboard = () => {
         navigate('/');
     };
 
+    const handleCredentialsUpdated = () => {
+        alert("Credentials updated successfully! Please login with new credentials.");
+        handleLogout();
+    };
+
     const dashboardCards = [
         {
             title: 'Supervisors',
@@ -90,8 +224,15 @@ const Dashboard = () => {
 
     return (
         <div className="min-h-screen bg-slate-50">
+            {/* Change Credentials Modal */}
+            <ChangeCredentialsModal
+                isOpen={showChangeCreds}
+                onClose={() => setShowChangeCreds(false)}
+                onSuccess={handleCredentialsUpdated}
+            />
+
             {/* Header */}
-            <header className="bg-white shadow-md">
+            <header className="bg-white shadow-md relative z-40">
                 <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
                     <div className="flex justify-between items-center w-full md:w-auto">
                         <div className="flex items-center gap-2 md:gap-3">
@@ -101,24 +242,44 @@ const Dashboard = () => {
                                 <p className="text-xs md:text-sm text-slate-600">Admin Dashboard</p>
                             </div>
                         </div>
-                        <button
-                            onClick={handleLogout}
-                            className="
-                md:bg-red-600 md:text-white 
-                text-red-600 md:px-4 md:py-2 
-                p-2 md:p-2 
-                rounded-full md:rounded-lg 
-                font-medium transition-all 
-                hover:bg-red-50 md:hover:bg-red-700 
-                flex items-center gap-2 
-                text-sm md:text-base 
-                justify-center
-              "
-                            title="Logout"
-                        >
-                            <LogOut size={20} className="md:w-[18px] md:h-[18px]" />
-                            <span className="hidden md:inline">Logout</span>
-                        </button>
+
+                        {/* Profile Dropdown */}
+                        <div className="relative" ref={dropdownRef}>
+                            <button
+                                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                            >
+                                <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                                    <User size={20} />
+                                </div>
+                                <span className="hidden md:block font-medium text-slate-700">Admin</span>
+                                <ChevronDown size={16} className={`text-slate-400 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {isProfileOpen && (
+                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <button
+                                        onClick={() => {
+                                            setIsProfileOpen(false);
+                                            setShowChangeCreds(true);
+                                        }}
+                                        className="w-full text-left px-4 py-3 text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                                    >
+                                        <Key size={18} className="text-slate-400" />
+                                        <span>Change Credentials</span>
+                                    </button>
+                                    <div className="h-px bg-slate-100 my-1"></div>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
+                                    >
+                                        <LogOut size={18} />
+                                        <span>Logout</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </header>
