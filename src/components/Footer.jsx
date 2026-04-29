@@ -43,7 +43,7 @@ const Footer = () => {
                 </div>
 
                 <div className="border-t border-white/10 pt-6 text-center text-slate-300">
-                    <p className="m-0">&copy; 2025 Shunmugam Textiles. All rights reserved.</p>
+                    <p className="m-0"> &copy; {new Date().getFullYear()} Shunmugam Textiles. All rights reserved.</p>
                     <p className="m-0 mt-2 text-sm text-slate-400">
                     Developed by{" "}
                     <span className="text-slate-300 font-medium">Kishore S</span> &{" "}
